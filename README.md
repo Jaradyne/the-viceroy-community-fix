@@ -45,7 +45,7 @@ The game's original Steam achievement call is otherwise left in place.
 
 1. Close The Viceroy.
 2. Extract this ZIP somewhere outside the Steam game directory.
-3. Double-click `ViceroyFix.bat`.
+3. Double-click `ViceroyFix.exe`.
 4. The patcher will look for the usual Steam install location.
 5. If your Steam library is elsewhere, paste the full path to either:
    - the `The Viceroy` game folder, or
@@ -86,7 +86,7 @@ reapplied if necessary.
 
 ## Restore the original game
 
-Run `ViceroyFix.bat` and choose **Restore original library.zip backup**.
+Run `ViceroyFix.exe` and choose **Restore original library.zip backup**.
 
 Or, with the game closed, manually replace `library.zip` with the saved
 `library.zip.viceroyfix-original`.
@@ -101,6 +101,10 @@ The patcher:
 - makes a backup of `library.zip`;
 - changes only the known audio crash instruction and Millennial Reign condition;
 - verifies the resulting patched SHA-256 before reporting success.
+
+`ViceroyFix.exe` is only a small native Windows launcher. It contains no game-patch
+logic; it starts the adjacent `ViceroyFix.ps1` and waits for it to finish. The
+launcher source is included in the repository as `ViceroyFixLauncher.c`.
 
 A pre-release development build of this patch briefly used a temporary
 Millennial Reign recovery shortcut. **That build should not be distributed.**
