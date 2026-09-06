@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $OriginalHash = "9b69230360a2b7a8fd3b4cb8cee06e81ddebcc4cd7ea05f4008c0d9fb39433f2"
 $AudioHash    = "35dd99256a689d39a14e6a8d99ca145daa25dbea9591b12e7007a58fc90e3c5d"
-$LegitHash    = "37a862f889ffcde626beaf2a28af72e4fa623cc430b5f90ff794794806d59e3e"
+$BothFixesHash = "37a862f889ffcde626beaf2a28af72e4fa623cc430b5f90ff794794806d59e3e"
 # Known non-public development state. Supported only so it can be removed.
 $LegacyShortcutHash = "cd38ab63d21e06426f5b96b7b3d782d2d6ca91da37a1aa9c1bfb44f2c304c09c"
 
@@ -248,7 +248,7 @@ function Remove-LegacyShortcut([byte[]]$Bytes) {
     return $Bytes
 }
 
-function Apply-LegitimateMillennialFix([byte[]]$Bytes) {
+function Apply-MillennialFix([byte[]]$Bytes) {
     if (-not (Test-BytesAt $Bytes $CodeLengthOffset $OldCodeLength)) {
         throw "Millennial Reign code-object length is not in the expected original state."
     }
@@ -261,7 +261,7 @@ function Apply-LegitimateMillennialFix([byte[]]$Bytes) {
     return Insert-Bytes $Bytes $TrampolineInsertOffset $AchievementTrampoline
 }
 
-function Remove-LegitimateMillennialFix([byte[]]$Bytes) {
+function Remove-MillennialFix([byte[]]$Bytes) {
     if (-not (Test-BytesAt $Bytes $CodeLengthOffset $NewCodeLength)) {
         throw "Millennial Reign code-object length is not in the expected patched state."
     }
@@ -282,7 +282,7 @@ function State-Name([string]$Hash) {
     switch ($Hash) {
         $OriginalHash { return "Original supported build" }
         $AudioHash    { return "Audio fix only" }
-        $LegitHash    { return "Both legitimate fixes installed" }
+        $BothFixesHash { return "Both fixes installed" }
         $LegacyShortcutHash { return "Known pre-release temporary shortcut state" }
         default       { return "Unknown / unsupported build" }
     }
@@ -306,7 +306,7 @@ $currentHash = Get-ByteHash $bytes
 Write-Host "Current state: $(State-Name $currentHash)"
 Write-Host "SHA-256: $currentHash"
 Write-Host ""
-Write-Host "1 - Apply BOTH legitimate bug fixes (recommended)"
+Write-Host "1 - Apply BOTH bug fixes (recommended)"
 Write-Host "2 - Apply audio-device crash fix only"
 Write-Host "3 - Restore original library.zip backup"
 Write-Host "4 - Exit"
@@ -332,7 +332,7 @@ if ($choice -eq "3") {
 if ($currentHash -notin @(
     $OriginalHash,
     $AudioHash,
-    $LegitHash,
+    $BothFixesHash,
     $LegacyShortcutHash
 )) {
     throw "This build is not recognized. Nothing was changed."
@@ -341,8 +341,8 @@ if ($currentHash -notin @(
 Ensure-Backup $LibraryZip | Out-Null
 
 if ($choice -eq "1") {
-    if ($currentHash -eq $LegitHash) {
-        Write-Host "Both legitimate fixes are already installed."
+    if ($currentHash -eq $BothFixesHash) {
+        Write-Host "Both fixes are already installed."
         exit 0
     }
 
@@ -356,11 +356,11 @@ if ($choice -eq "1") {
     }
 
     $bytes = Apply-AudioFix $bytes
-    $bytes = Apply-LegitimateMillennialFix $bytes
+    $bytes = Apply-MillennialFix $bytes
 
     $newHash = Get-ByteHash $bytes
-    if ($newHash -ne $LegitHash) {
-        throw "Patch output did not match the expected legitimate-fix hash. Nothing written."
+    if ($newHash -ne $BothFixesHash) {
+        throw "Patch output did not match the expected final hash. Nothing written."
     }
 }
 elseif ($choice -eq "2") {
@@ -376,8 +376,8 @@ elseif ($choice -eq "2") {
             throw "Could not cleanly remove the pre-release shortcut state."
         }
     }
-    elseif ($currentHash -eq $LegitHash) {
-        $bytes = Remove-LegitimateMillennialFix $bytes
+    elseif ($currentHash -eq $BothFixesHash) {
+        $bytes = Remove-MillennialFix $bytes
         $newHash = Get-ByteHash $bytes
         if ($newHash -ne $AudioHash) {
             throw "Could not cleanly remove the Millennial Reign fix."
@@ -400,7 +400,7 @@ Write-MainPyc $LibraryZip $entryName $bytes
 $verify = Read-MainPyc $LibraryZip
 $verifyHash = Get-ByteHash $verify.Bytes
 
-if ($choice -eq "1" -and $verifyHash -ne $LegitHash) {
+if ($choice -eq "1" -and $verifyHash -ne $BothFixesHash) {
     throw "Verification failed after writing library.zip."
 }
 if ($choice -eq "2" -and $verifyHash -ne $AudioHash) {
