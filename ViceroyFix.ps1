@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$TargetPath
 )
 
@@ -113,7 +113,8 @@ function Remove-Bytes([byte[]]$Bytes, [int]$Offset, [int]$Count) {
     [Array]::Copy($Bytes, 0, $result, 0, $Offset)
     [Array]::Copy(
         $Bytes, $Offset + $Count,
-        $result, $Offset,
+        $result,
+        $Offset,
         $Bytes.Length - ($Offset + $Count)
     )
     return $result
@@ -219,16 +220,77 @@ function Write-MainPyc([string]$LibraryZip, [string]$EntryName, [byte[]]$Bytes) 
     finally { $zip.Dispose() }
 }
 
-function Ensure-Backup([string]$LibraryZip) {
+function Get-MainHashFromLibrary([string]$LibraryZip) {
+    $loaded = Read-MainPyc $LibraryZip
+    return Get-ByteHash $loaded.Bytes
+}
+
+function Ensure-OriginalBackup([string]$LibraryZip, [string]$CurrentHash) {
     $backup = "$LibraryZip.viceroyfix-original"
-    if (-not (Test-Path -LiteralPath $backup)) {
-        Copy-Item -LiteralPath $LibraryZip -Destination $backup
-        Write-Host "Created backup: $backup"
+
+    if ((Test-Path -LiteralPath $backup) -and -not (Test-Path -LiteralPath $backup -PathType Leaf)) {
+        throw "The backup path exists but is not a file: $backup"
     }
-    else {
-        Write-Host "Backup already exists; leaving it untouched."
+
+    if (Test-Path -LiteralPath $backup -PathType Leaf) {
+        $backupHash = $null
+        try {
+            $backupHash = Get-MainHashFromLibrary $backup
+        }
+        catch {
+            if ($CurrentHash -ne $OriginalHash) {
+                throw "The existing backup could not be verified as the supported original build. Nothing was changed. Restore the game with Steam's Verify integrity of game files, then run the patcher again."
+            }
+        }
+
+        if ($backupHash -eq $OriginalHash) {
+            Write-Host "Verified original backup: $backup"
+            return $backup
+        }
+
+        if ($CurrentHash -ne $OriginalHash) {
+            throw "The existing backup is not the supported original build. Nothing was changed. Restore the game with Steam's Verify integrity of game files, then run the patcher again."
+        }
+
+        $stamp = Get-Date -Format "yyyyMMdd-HHmmssfff"
+        $preserved = "$backup.unverified-$stamp"
+        Move-Item -LiteralPath $backup -Destination $preserved
+        Write-Host "Preserved non-original backup as: $preserved"
     }
+
+    if ($CurrentHash -ne $OriginalHash) {
+        throw "No verified original backup exists, and this installation is already modified. Nothing was changed. Use Steam's Verify integrity of game files to restore the supported original build, then run the patcher again."
+    }
+
+    Copy-Item -LiteralPath $LibraryZip -Destination $backup
+    $verifyHash = Get-MainHashFromLibrary $backup
+    if ($verifyHash -ne $OriginalHash) {
+        throw "The newly created backup did not verify as the supported original build. Nothing was patched."
+    }
+
+    Write-Host "Created and verified original backup: $backup"
     return $backup
+}
+
+function Restore-OriginalBackup([string]$LibraryZip) {
+    $backup = "$LibraryZip.viceroyfix-original"
+    if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) {
+        throw "No backup found at $backup"
+    }
+
+    $backupHash = Get-MainHashFromLibrary $backup
+    if ($backupHash -ne $OriginalHash) {
+        throw "The saved backup is not the supported original build. Refusing to restore it. Use Steam's Verify integrity of game files instead."
+    }
+
+    Copy-Item -LiteralPath $backup -Destination $LibraryZip -Force
+    $restoredHash = Get-MainHashFromLibrary $LibraryZip
+    if ($restoredHash -ne $OriginalHash) {
+        throw "Restore verification failed after writing library.zip."
+    }
+
+    Write-Host ""
+    Write-Host "Original library.zip restored and verified."
 }
 
 function Apply-AudioFix([byte[]]$Bytes) {
@@ -319,13 +381,7 @@ if ($choice -eq "4") {
 }
 
 if ($choice -eq "3") {
-    $backup = "$LibraryZip.viceroyfix-original"
-    if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) {
-        throw "No backup found at $backup"
-    }
-    Copy-Item -LiteralPath $backup -Destination $LibraryZip -Force
-    Write-Host ""
-    Write-Host "Original library.zip restored."
+    Restore-OriginalBackup $LibraryZip
     exit 0
 }
 
@@ -338,13 +394,13 @@ if ($currentHash -notin @(
     throw "This build is not recognized. Nothing was changed."
 }
 
-Ensure-Backup $LibraryZip | Out-Null
-
 if ($choice -eq "1") {
     if ($currentHash -eq $BothFixesHash) {
         Write-Host "Both fixes are already installed."
         exit 0
     }
+
+    Ensure-OriginalBackup $LibraryZip $currentHash | Out-Null
 
     # If the non-public development shortcut was ever tested, remove it first.
     if ($currentHash -eq $LegacyShortcutHash) {
@@ -368,6 +424,8 @@ elseif ($choice -eq "2") {
         Write-Host "Audio fix is already installed."
         exit 0
     }
+
+    Ensure-OriginalBackup $LibraryZip $currentHash | Out-Null
 
     if ($currentHash -eq $LegacyShortcutHash) {
         $bytes = Remove-LegacyShortcut $bytes

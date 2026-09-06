@@ -58,6 +58,7 @@ typedef struct _PROCESS_INFORMATION {
 #pragma pack(pop)
 
 DLLIMPORT DWORD  WINAPI GetModuleFileNameW(HMODULE, LPWSTR, DWORD);
+DLLIMPORT DWORD  WINAPI GetSystemDirectoryW(LPWSTR, DWORD);
 DLLIMPORT BOOL   WINAPI CreateProcessW(LPCWSTR, LPWSTR, LPVOID, LPVOID, BOOL, DWORD, LPVOID, LPCWSTR, STARTUPINFOW*, PROCESS_INFORMATION*);
 DLLIMPORT DWORD  WINAPI WaitForSingleObject(HANDLE, DWORD);
 DLLIMPORT BOOL   WINAPI GetExitCodeProcess(HANDLE, DWORD*);
@@ -69,6 +70,7 @@ DLLIMPORT void   WINAPI ExitProcess(DWORD);
 DLLIMPORT BOOL   WINAPI SetConsoleTitleW(LPCWSTR);
 
 static WCHAR g_module_path[32768];
+static WCHAR g_powershell_path[32768];
 static WCHAR g_command[32768];
 static STARTUPINFOW g_si;
 static PROCESS_INFORMATION g_pi;
@@ -118,12 +120,33 @@ void entry(void) {
     }
     g_module_path[slash] = 0; // directory, including trailing slash
 
+    DWORD sys_len = GetSystemDirectoryW(g_powershell_path, 32768);
+    if (!sys_len || sys_len >= 32768) {
+        write_ascii("Could not determine the Windows system directory.\r\n");
+        pause_console();
+        ExitProcess(1);
+    }
+
+    DWORD ps_pos = sys_len;
+    if (ps_pos > 0 && g_powershell_path[ps_pos - 1] != L'\\') {
+        if (!append_w(g_powershell_path, 32768, &ps_pos, L"\\")) {
+            write_ascii("Windows system path is too long.\r\n");
+            pause_console();
+            ExitProcess(1);
+        }
+    }
+    if (!append_w(g_powershell_path, 32768, &ps_pos, L"WindowsPowerShell\\v1.0\\powershell.exe")) {
+        write_ascii("Windows PowerShell path is too long.\r\n");
+        pause_console();
+        ExitProcess(1);
+    }
+
     DWORD pos = 0;
-    const WCHAR* pre = L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"";
-    const WCHAR* script = L"ViceroyFix.ps1\"";
-    if (!append_w(g_command, 32768, &pos, pre) ||
+    if (!append_w(g_command, 32768, &pos, L"\"") ||
+        !append_w(g_command, 32768, &pos, g_powershell_path) ||
+        !append_w(g_command, 32768, &pos, L"\" -NoProfile -ExecutionPolicy Bypass -File \"") ||
         !append_w(g_command, 32768, &pos, g_module_path) ||
-        !append_w(g_command, 32768, &pos, script)) {
+        !append_w(g_command, 32768, &pos, L"ViceroyFix.ps1\"")) {
         write_ascii("Launcher path is too long.\r\n");
         pause_console();
         ExitProcess(1);
@@ -131,7 +154,7 @@ void entry(void) {
 
     g_si.cb = (DWORD)sizeof(g_si);
 
-    BOOL ok = CreateProcessW((LPCWSTR)0, g_command, (LPVOID)0, (LPVOID)0, TRUE, 0, (LPVOID)0,
+    BOOL ok = CreateProcessW(g_powershell_path, g_command, (LPVOID)0, (LPVOID)0, TRUE, 0, (LPVOID)0,
                              g_module_path, &g_si, &g_pi);
     if (!ok) {
         write_ascii("Could not start Windows PowerShell. Make sure ViceroyFix.ps1 is beside ViceroyFix.exe.\r\n");

@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     paths:
+      - README.md
+      - ViceroyFix.ps1
       - ViceroyFixLauncher.c
+      - LICENSE.txt
       - .github/workflows/build-launcher.yml
   workflow_dispatch:
 
@@ -22,7 +25,7 @@ jobs:
           git config --global core.eol lf
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build native launcher
         shell: pwsh
@@ -42,6 +45,7 @@ jobs:
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           $devcmd = Join-Path $vs "Common7\Tools\VsDevCmd.bat"
           cmd.exe /d /s /c "call `"$devcmd`" -arch=amd64 -host_arch=amd64 && dumpbin.exe /imports ViceroyFix.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Could not inspect launcher imports." }
 
       - name: Refresh package checksums
         shell: pwsh

@@ -53,11 +53,18 @@ The game's original Steam achievement call is otherwise left in place.
 6. Choose **Apply both bug fixes**.
 7. Start The Viceroy normally through Steam.
 
-The first time it modifies the game, the patcher creates:
+Before modifying an original supported installation, the patcher creates:
 
     library.zip.viceroyfix-original
 
-It will not overwrite that backup on later runs.
+The patcher verifies that the backup contains the supported original main game
+file before relying on it. It will not silently replace a verified original
+backup on later runs.
+
+If the game is already modified and no verified original backup exists, the
+patcher refuses to create a misleading "original" backup. Use Steam's **Verify
+integrity of game files** to restore the supported original build, then run the
+patcher again.
 
 ## Supported build
 
@@ -88,8 +95,9 @@ reapplied if necessary.
 
 Run `ViceroyFix.exe` and choose **Restore original library.zip backup**.
 
-Or, with the game closed, manually replace `library.zip` with the saved
-`library.zip.viceroyfix-original`.
+The patcher verifies the saved backup before restoring it. If no verified
+original backup is available, use Steam's **Verify integrity of game files**
+instead.
 
 ## Technical notes
 
@@ -98,7 +106,7 @@ Both confirmed defects are in `the viceroy__main__.pyc`, not `steam.pyc`.
 The patcher:
 
 - verifies the exact SHA-256 of the contained main game file;
-- makes a backup of `library.zip`;
+- creates and verifies an original `library.zip` backup before modifying a clean install;
 - changes only the known audio crash instruction and Millennial Reign condition;
 - verifies the resulting patched SHA-256 before reporting success.
 
