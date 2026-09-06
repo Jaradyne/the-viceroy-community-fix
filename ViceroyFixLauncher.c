@@ -70,11 +70,8 @@ DLLIMPORT BOOL   WINAPI SetConsoleTitleW(LPCWSTR);
 
 static WCHAR g_module_path[32768];
 static WCHAR g_command[32768];
-
-static void zero_bytes(void* ptr, DWORD count) {
-    BYTE* p = (BYTE*)ptr;
-    for (DWORD i = 0; i < count; ++i) p[i] = 0;
-}
+static STARTUPINFOW g_si;
+static PROCESS_INFORMATION g_pi;
 
 static BOOL append_w(WCHAR* dst, DWORD cap, DWORD* pos, const WCHAR* src) {
     while (*src) {
@@ -132,25 +129,21 @@ void entry(void) {
         ExitProcess(1);
     }
 
-    STARTUPINFOW si;
-    PROCESS_INFORMATION pi;
-    zero_bytes(&si, (DWORD)sizeof(si));
-    zero_bytes(&pi, (DWORD)sizeof(pi));
-    si.cb = (DWORD)sizeof(si);
+    g_si.cb = (DWORD)sizeof(g_si);
 
     BOOL ok = CreateProcessW((LPCWSTR)0, g_command, (LPVOID)0, (LPVOID)0, TRUE, 0, (LPVOID)0,
-                             g_module_path, &si, &pi);
+                             g_module_path, &g_si, &g_pi);
     if (!ok) {
         write_ascii("Could not start Windows PowerShell. Make sure ViceroyFix.ps1 is beside ViceroyFix.exe.\r\n");
         pause_console();
         ExitProcess(1);
     }
 
-    WaitForSingleObject(pi.hProcess, INFINITE);
+    WaitForSingleObject(g_pi.hProcess, INFINITE);
     DWORD exit_code = 1;
-    GetExitCodeProcess(pi.hProcess, &exit_code);
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
+    GetExitCodeProcess(g_pi.hProcess, &exit_code);
+    CloseHandle(g_pi.hThread);
+    CloseHandle(g_pi.hProcess);
 
     pause_console();
     ExitProcess(exit_code);
