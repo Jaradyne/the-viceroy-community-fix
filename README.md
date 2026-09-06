@@ -41,13 +41,6 @@ The patch restores the intended test:
 
 The game's original Steam achievement call is otherwise left in place.
 
-**This is not a forced achievement unlock.** The achievement is awarded only
-when the active Territory actually reaches turn 1,000 while the repaired
-condition is present.
-
-The patch deliberately uses `== 1000`, matching the apparent original intent,
-rather than silently changing the rule to `>= 1000`.
-
 ## Installation
 
 1. Close The Viceroy.
