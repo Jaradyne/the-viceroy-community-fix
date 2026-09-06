@@ -1,0 +1,62 @@
+name: Build Windows launcher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ViceroyFixLauncher.c
+      - .github/workflows/build-launcher.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-launcher:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build native launcher
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "Visual Studio C++ tools were not found on the runner." }
+          $devcmd = Join-Path $vs "Common7\Tools\VsDevCmd.bat"
+          $cmd = "call `"$devcmd`" -arch=amd64 -host_arch=amd64 && cl.exe /nologo /O1 /GS- /c ViceroyFixLauncher.c /Fo:ViceroyFixLauncher.obj && link.exe /nologo /entry:entry /subsystem:console /nodefaultlib /machine:x64 /dynamicbase /nxcompat ViceroyFixLauncher.obj kernel32.lib /out:ViceroyFix.exe"
+          cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "Launcher build failed with exit code $LASTEXITCODE." }
+
+      - name: Show executable imports
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $devcmd = Join-Path $vs "Common7\Tools\VsDevCmd.bat"
+          cmd.exe /d /s /c "call `"$devcmd`" -arch=amd64 -host_arch=amd64 && dumpbin.exe /imports ViceroyFix.exe"
+
+      - name: Refresh package checksums
+        shell: pwsh
+        run: |
+          $files = @("README.md", "ViceroyFix.exe", "ViceroyFix.ps1", "LICENSE.txt")
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
+            "$hash  $file"
+          }
+          [IO.File]::WriteAllText("SHA256SUMS.txt", ($lines -join "`n") + "`n", [Text.Encoding]::ASCII)
+
+      - name: Commit generated launcher
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ViceroyFix.exe SHA256SUMS.txt
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Build Windows launcher"
+            git push
+          } else {
+            Write-Host "Launcher and checksums are already current."
+          }
