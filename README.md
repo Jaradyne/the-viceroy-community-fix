@@ -69,7 +69,7 @@ Audio-fix-only state:
 
     35dd99256a689d39a14e6a8d99ca145daa25dbea9591b12e7007a58fc90e3c5d
 
-Both legitimate fixes installed:
+Both fixes installed:
 
     37a862f889ffcde626beaf2a28af72e4fa623cc430b5f90ff794794806d59e3e
 
@@ -105,7 +105,7 @@ The patcher:
 A pre-release development build of this patch briefly used a temporary
 Millennial Reign recovery shortcut. **That build should not be distributed.**
 This public package does not contain or enable that shortcut. If it encounters
-that known development state, it converts it to the legitimate repaired logic.
+that known development state, it converts it to the repaired logic.
 
 ## Distribution
 
