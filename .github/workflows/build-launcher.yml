@@ -27,6 +27,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Validate PowerShell patcher syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "ViceroyFix.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw "ViceroyFix.ps1 contains PowerShell syntax errors."
+          }
+
       - name: Build native launcher
         shell: pwsh
         run: |
